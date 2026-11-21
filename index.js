@@ -1,5 +1,11 @@
 const express = require("express");
 const tmi = require("tmi.js");
+const { Pool } = require("pg");
+
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false }
+});
 
 const app = express();
 const PORT = process.env.PORT || 10000;
@@ -11,6 +17,10 @@ const CHANNEL = process.env.TWITCH_CHANNEL || "enduxfps";
 let live = false;
 let scores = new Map();
 let lastUpdate = Date.now();
+
+function formatHours(minutes) {
+  return (minutes / 60).toFixed(1).replace(".", ",") + "h";
+}
 
 async function getChatters() {
   const response = await fetch(
@@ -53,6 +63,7 @@ async function checkLive() {
 
   if (isLive && !live) {
     scores.clear();
+    lastUpdate = Date.now();
     console.log("Endux ist live – Tracking gestartet");
   }
 
@@ -90,7 +101,7 @@ app.get("/top5", (req, res) => {
   res.send(
     top.length
       ? `TOP 5 WATCHTIME » ${top.map((u, i) =>
-          `${["#1", "#2", "#3", "#4", "#5"][i]} ${u[0]} ◆ ${Math.floor(u[1])}m`
+          `#${i + 1} ${u[0]} ◆ ${formatHours(u[1])}`
         ).join(" | ")}`
       : "TOP 5 WATCHTIME » Wird ermittelt"
   );
@@ -98,7 +109,7 @@ app.get("/top5", (req, res) => {
 
 app.get("/test", (req, res) => {
   res.send(
-    "TOP 5 WATCHTIME » Timmy ◆ 125m | Vex ◆ 98m | Luke ◆ 76m | Viewer4 ◆ 54m | Viewer5 ◆ 32m"
+    "TOP 5 WATCHTIME » #1 Timmy ◆ 2,1h | #2 Vex ◆ 1,6h | #3 Luke ◆ 1,3h | #4 Viewer4 ◆ 0,9h | #5 Viewer5 ◆ 0,5h"
   );
 });
 
@@ -111,7 +122,7 @@ app.get("/abstand", (req, res) => {
   const position = ranking.findIndex(u => u[0].toLowerCase() === username);
 
   if (position === -1) {
-    return res.send("Du bist noch nicht im Watchtime-Ranking, bleib noch etwas da.");
+    return res.send("Du bist noch nicht im Watchtime-Ranking, bleib noch etwas da ^^");
   }
 
   if (position === 0) {
@@ -120,14 +131,16 @@ app.get("/abstand", (req, res) => {
 
   const missing = Math.max(
     1,
-    Math.ceil(ranking[position - 1][1] - ranking[position][1])
+    ranking[position - 1][1] - ranking[position][1]
   );
 
-  res.send(`ABSTAND ZUM NÄCHSTEN PLATZ » Noch ${missing} Min. bis Platz ${position}!`);
+  res.send(
+    `ABSTAND ZUM NÄCHSTEN PLATZ » Noch ${formatHours(missing)} bis Platz ${position}!`
+  );
 });
 
 app.get("/abstandtest", (req, res) => {
-  res.send("ABSTAND ZUM NÄCHSTEN PLATZ » Noch 12 Min. bis Platz 3!");
+  res.send("ABSTAND ZUM NÄCHSTEN PLATZ » Noch 0,2h bis Platz 3!");
 });
 
 app.listen(PORT, () => {
