@@ -98,7 +98,7 @@ app.get("/top5", (req, res) => {
 
 app.get("/test", (req, res) => {
   res.send(
-    "TOP 5 WATCHTIME » Timmy — 125m | Vex — 98m | Luke — 76m | Viewer4 — 54m | Viewer5 — 32m"
+    "TOP 5 WATCHTIME » Timmy ◆ 125m | Vex ◆ 98m | Luke ◆ 76m | Viewer4 ◆ 54m | Viewer5 ◆ 32m"
   );
 });
 
