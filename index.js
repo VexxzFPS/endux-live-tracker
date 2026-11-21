@@ -6,7 +6,7 @@ const PORT = process.env.PORT || 10000;
 
 const CLIENT_ID = process.env.TWITCH_CLIENT_ID;
 const CLIENT_SECRET = process.env.TWITCH_CLIENT_SECRET;
-const CHANNEL = "enduxfps";
+const CHANNEL = process.env.TWITCH_CHANNEL || "enduxfps";
 
 let token = "";
 let tokenExpiry = 0;
