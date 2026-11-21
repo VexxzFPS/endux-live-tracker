@@ -275,21 +275,19 @@ app.get("/top5", async (req, res) => {
       [EXCLUDED_USERS]
     );
 
-    res.send(
-      result.rows.length
-        ? `TOP 5 WATCHTIME OF TODAY »⠀⠀⠀⠀⠀⠀⠀⠀${result.rows
-            .map(
-              (u, i) =>
-                `#${i + 1} ${u.user_login} · ${formatHours(
-                  Number(u.minutes)
-                )}`
-            )
-            .join(" | ")}`
-        : "TOP 5 WATCHTIME » Wird ermittelt"
-    );
-  } catch (error) {
-    console.log("Top5 Fehler:", error.message);
-    res.send("TOP 5 WATCHTIME » Fehler beim Laden");
+   res.send(
+  result.rows.length
+    ? `TOP 5 WATCHTIME OF TODAY »⠀⠀⠀⠀⠀⠀⠀⠀${result.rows
+        .map((u, i) => {
+          const name = u.user_login.padEnd(16, " ").slice(0, 16);
+          const rank = `#${i + 1}`;
+          const time = formatHours(Number(u.minutes));
+
+          return `${rank} ${name} · ${time}`;
+        })
+        .join("⠀")}`
+    : "TOP 5 WATCHTIME » Wird ermittelt"
+);
   }
 });
 
