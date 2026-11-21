@@ -271,7 +271,7 @@ app.get("/top5", async (req, res) => {
 
     res.send(
       result.rows.length
-        ? `TOP 5 WATCHTIME OF TODAY »⠀⠀⠀⠀⠀⠀⠀⠀${result.rows
+        ? `TOP 5 WATCHTIME OF TODAY » ${result.rows
             .map((u, i) => {
               const name = u.user_login.padEnd(16, " ").slice(0, 16);
               const rank = `#${i + 1}`;
