@@ -21,9 +21,9 @@ const SE_LIMIT = 100;
 const EXCLUDED_USERS = [
   "nightbot",
   "streamelements",
-  "moobot",
-  "fossabot",
-  "streamlabs"
+  "hexe_bot",
+  "streamlabs",
+  "creatisbot"
 ];
 
 let live = false;
@@ -277,7 +277,7 @@ app.get("/top5", async (req, res) => {
 
     res.send(
       result.rows.length
-        ? `TOP 5 WATCHTIME » ${result.rows
+        ? `TOP 5 WATCHTIME OF TODAY » ${result.rows
             .map(
               (u, i) =>
                 `#${i + 1} ${u.user_login} · ${formatHours(
