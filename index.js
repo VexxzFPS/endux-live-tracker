@@ -93,6 +93,11 @@ app.get("/top5", (req, res) => {
       ).join(" | ")
     : "Top 5 – Viewer mit der meisten Watchtime des heutigen Streams");
 });
+app.get("/test", (req, res) => {
+  res.send(
+    "TOP 5 WATCHTIME: #1 Timmy (125 Min.) | #2 Vex (98 Min.) | #3 Luke (76 Min.) | #4 Viewer4 (54 Min.) | #5 Viewer5 (32 Min.)"
+  );
+});
 
 app.listen(PORT, () => {
   console.log("Server läuft auf Port " + PORT);
