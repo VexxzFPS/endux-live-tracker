@@ -254,7 +254,7 @@ app.get("/top5", async (req, res) => {
     res.send(
       result.rows.length
         ? `TOP 5 WATCHTIME » ${result.rows.map((u, i) =>
-            `#${i + 1} ${u.user_login} ◆ ${formatHours(Number(u.minutes))}`
+            `#${i + 1} ${u.user_login} › ${formatHours(Number(u.minutes))}`
           ).join(" | ")}`
         : "TOP 5 WATCHTIME » Wird ermittelt"
     );
