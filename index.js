@@ -111,7 +111,7 @@ app.get("/abstand", (req, res) => {
   const position = ranking.findIndex(u => u[0].toLowerCase() === username);
 
   if (position === -1) {
-    return res.send("Du bist noch nicht im Watchtime-Ranking.");
+    return res.send("Du bist noch nicht im Watchtime-Ranking, bleib noch etwas da.");
   }
 
   if (position === 0) {
@@ -124,6 +124,10 @@ app.get("/abstand", (req, res) => {
   );
 
   res.send(`ABSTAND ZUM NÄCHSTEN PLATZ » Noch ${missing} Min. bis Platz ${position}!`);
+});
+
+app.get("/abstandtest", (req, res) => {
+  res.send("ABSTAND ZUM NÄCHSTEN PLATZ » Noch 12 Min. bis Platz 3!");
 });
 
 app.listen(PORT, () => {
