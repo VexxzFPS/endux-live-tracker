@@ -1,4 +1,3 @@
-
 const express = require("express");
 const { Pool } = require("pg");
 
@@ -14,9 +13,18 @@ const CLIENT_ID = process.env.TWITCH_CLIENT_ID;
 const TOKEN = process.env.TWITCH_USER_TOKEN;
 const CHANNEL = process.env.TWITCH_CHANNEL || "enduxfps";
 
-// Öffentliche StreamElements-Channel-ID von EnduxFPS
+// StreamElements-Channel-ID von EnduxFPS
 const SE_CHANNEL_ID = "62a195a071bbb573d524e640";
 const SE_LIMIT = 100;
+
+// Bots, die NICHT in !top5 gezählt werden
+const EXCLUDED_USERS = [
+  "nightbot",
+  "streamelements",
+  "moobot",
+  "fossabot",
+  "streamlabs"
+];
 
 let live = false;
 let currentStreamId = null;
@@ -35,7 +43,7 @@ function formatDaysHours(minutes) {
   return `${days} ${days === 1 ? "Tag" : "Tage"} ${hours} ${hours === 1 ? "Stunde" : "Stunden"}`;
 }
 
-// StreamElements-Gesamtwatchtime vollständig synchronisieren
+// StreamElements-Gesamtwatchtime synchronisieren
 async function syncStreamElementsWatchtime() {
   if (syncRunning) return;
   syncRunning = true;
@@ -69,7 +77,10 @@ async function syncStreamElementsWatchtime() {
       total = Number(data._total || allUsers.length);
 
       console.log(
-        `Watchtime geladen: ${Math.min(offset + data.users.length, total)} / ${total}`
+        `Watchtime geladen: ${Math.min(
+          offset + data.users.length,
+          total
+        )} / ${total}`
       );
 
       if (data.users.length === 0 || allUsers.length >= total) {
@@ -80,23 +91,26 @@ async function syncStreamElementsWatchtime() {
     }
 
     if (allUsers.length === 0) {
-      throw new Error("Keine Nutzer geladen – Datenbank bleibt unverändert");
+      throw new Error(
+        "Keine Nutzer geladen – Datenbank bleibt unverändert"
+      );
     }
 
-    // Nutzer in Paketen in Neon speichern
     for (let start = 0; start < allUsers.length; start += 500) {
       const batch = allUsers.slice(start, start + 500);
       const values = [];
       const placeholders = [];
 
-      batch.forEach((user, index) => {
+      batch.forEach((user) => {
         const username = String(user.username || "").toLowerCase();
         const minutes = Number(user.minutes);
 
         if (!username || !Number.isFinite(minutes)) return;
 
         const position = values.length / 2;
+
         values.push(username, minutes);
+
         placeholders.push(
           `($${position * 2 + 1}, $${position * 2 + 2})`
         );
@@ -113,7 +127,6 @@ async function syncStreamElementsWatchtime() {
       );
     }
 
-    // Veraltete Einträge entfernen, wenn der vollständige Abruf gelang
     const usernames = allUsers
       .map(user => String(user.username || "").toLowerCase())
       .filter(Boolean);
@@ -206,7 +219,9 @@ async function checkLive() {
 
       live = true;
     } else {
-      if (live) console.log("Endux offline – Tracking gestoppt");
+      if (live) {
+        console.log("Endux offline – Tracking gestoppt");
+      }
 
       live = false;
       currentStreamId = null;
@@ -228,12 +243,19 @@ async function trackChatters() {
   lastUpdate = now;
 
   for (const chatter of chatters) {
+    const username = chatter.user_login.toLowerCase();
+
+    // Bots nicht in !top5 zählen
+    if (EXCLUDED_USERS.includes(username)) {
+      continue;
+    }
+
     await pool.query(
       `INSERT INTO stream_watchtime (user_login, minutes)
        VALUES ($1, $2)
        ON CONFLICT (user_login)
        DO UPDATE SET minutes = stream_watchtime.minutes + $2`,
-      [chatter.user_login, elapsed]
+      [username, elapsed]
     );
   }
 }
@@ -247,15 +269,22 @@ app.get("/top5", async (req, res) => {
     const result = await pool.query(
       `SELECT user_login, minutes
        FROM stream_watchtime
+       WHERE NOT (user_login = ANY($1::text[]))
        ORDER BY minutes DESC
-       LIMIT 5`
+       LIMIT 5`,
+      [EXCLUDED_USERS]
     );
 
     res.send(
       result.rows.length
-        ? `TOP 5 WATCHTIME » ${result.rows.map((u, i) =>
-            `#${i + 1} ${u.user_login} › ${formatHours(Number(u.minutes))}`
-          ).join(" | ")}`
+        ? `TOP 5 WATCHTIME » ${result.rows
+            .map(
+              (u, i) =>
+                `#${i + 1} ${u.user_login} · ${formatHours(
+                  Number(u.minutes)
+                )}`
+            )
+            .join(" | ")}`
         : "TOP 5 WATCHTIME » Wird ermittelt"
     );
   } catch (error) {
@@ -266,7 +295,7 @@ app.get("/top5", async (req, res) => {
 
 app.get("/test", (req, res) => {
   res.send(
-    "TOP 5 WATCHTIME » #1 Timmy ◆ 2,1h | #2 Vex ◆ 1,6h | #3 Luke ◆ 1,3h | #4 Viewer4 ◆ 0,9h | #5 Viewer5 ◆ 0,5h"
+    "TOP 5 WATCHTIME » #1 Timmy · 2,1h | #2 Vex · 1,6h | #3 Luke · 1,3h | #4 Viewer4 · 0,9h | #5 Viewer5 · 0,5h"
   );
 });
 
@@ -285,6 +314,7 @@ app.get("/abstand", async (req, res) => {
     );
 
     const ranking = result.rows;
+
     const position = ranking.findIndex(
       user => user.user_login.toLowerCase() === username
     );
@@ -294,7 +324,9 @@ app.get("/abstand", async (req, res) => {
     }
 
     if (position === 0) {
-      return res.send("ABSTAND ZUM NÄCHSTEN PLATZ » Du bist aktuell auf Platz 1!");
+      return res.send(
+        "ABSTAND ZUM NÄCHSTEN PLATZ » Du bist aktuell auf Platz 1!"
+      );
     }
 
     const missing = Math.max(
@@ -310,7 +342,9 @@ app.get("/abstand", async (req, res) => {
     }
 
     res.send(
-      `ABSTAND ZUM NÄCHSTEN PLATZ » Noch ${formatDaysHours(missing)} bis Platz ${position}!`
+      `ABSTAND ZUM NÄCHSTEN PLATZ » Noch ${formatDaysHours(
+        missing
+      )} bis Platz ${position}!`
     );
   } catch (error) {
     console.log("Abstand Fehler:", error.message);
