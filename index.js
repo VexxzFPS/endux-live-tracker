@@ -90,7 +90,7 @@ app.get("/top5", (req, res) => {
   res.send(
     top.length
       ? `TOP 5 WATCHTIME » ${top.map((u, i) =>
-          `${["➊", "➋", "➌", "➍", "➎"][i]} ${u[0]} ◆ ${Math.floor(u[1])}m`
+          `${["#1", "#2", "#3", "#4", "#5"][i]} ${u[0]} ◆ ${Math.floor(u[1])}m`
         ).join(" | ")}`
       : "TOP 5 WATCHTIME » Wird ermittelt"
   );
@@ -98,7 +98,7 @@ app.get("/top5", (req, res) => {
 
 app.get("/test", (req, res) => {
   res.send(
-    "TOP 5 WATCHTIME » ➊ Timmy — 125m | ➋ Vex — 98m | ➌ Luke — 76m | ➍ Viewer4 — 54m | ➎ Viewer5 — 32m"
+    "TOP 5 WATCHTIME » Timmy — 125m | Vex — 98m | Luke — 76m | Viewer4 — 54m | Viewer5 — 32m"
   );
 });
 
