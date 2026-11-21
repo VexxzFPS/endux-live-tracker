@@ -89,9 +89,9 @@ app.get("/top5", (req, res) => {
 
   res.send(top.length
     ? top.map((u, i) =>
-        `${i + 1}. ${u[0]} (${Math.floor(u[1])} Min.)`
+        `${["#1", "#2", "#3", "#4", "#5"][i]} ${u[0]} (${Math.floor(u[1])} Min.)`
       ).join(" | ")
-    : "🏆 Top 5 werden ermittelt");
+    : "Top 5 – Viewer mit der meisten Watchtime des heutigen Streams");
 });
 
 app.listen(PORT, () => {
