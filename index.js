@@ -95,7 +95,7 @@ app.get("/top5", (req, res) => {
 });
 app.get("/test", (req, res) => {
   res.send(
-    "TOP 5 WATCHTIME: #1 Timmy (125 Min.) | #2 Vex (98 Min.) | #3 Luke (76 Min.) | #4 Viewer4 (54 Min.) | #5 Viewer5 (32 Min.)"
+    "TOP 5 WATCHTIME: #1 Timmy (125 Min.) \n #2 Vex (98 Min.) \n #3 Luke (76 Min.) \n #4 Viewer4 (54 Min.) \n #5 Viewer5 (32 Min.)"
   );
 });
 
