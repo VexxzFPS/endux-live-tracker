@@ -95,7 +95,7 @@ app.get("/top5", (req, res) => {
       : "TOP 5 WATCHTIME » Wird ermittelt"
   );
 });
-});
+
 app.get("/test", (req, res) => {
   res.send(
     "TOP 5 WATCHTIME » ➊ Timmy — 125m | ➋ Vex — 98m | ➌ Luke — 76m | ➍ Viewer4 — 54m | ➎ Viewer5 — 32m"
