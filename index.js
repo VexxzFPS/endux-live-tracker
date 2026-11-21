@@ -98,5 +98,5 @@ app.listen(PORT, () => {
   console.log("Server läuft auf Port " + PORT);
   checkLive();
   setInterval(checkLive, 60000);
-  setInterval(trackChatters, 60000);
+  setInterval(trackChatters, 30000);
 });
