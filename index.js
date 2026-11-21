@@ -1,3 +1,4 @@
+
 const express = require("express");
 const { Pool } = require("pg");
 
@@ -13,34 +14,17 @@ const CLIENT_ID = process.env.TWITCH_CLIENT_ID;
 const TOKEN = process.env.TWITCH_USER_TOKEN;
 const CHANNEL = process.env.TWITCH_CHANNEL || "enduxfps";
 
+// Öffentliche StreamElements-Channel-ID von EnduxFPS
+const SE_CHANNEL_ID = "62a195a071bbb573d524e640";
+const SE_LIMIT = 100;
+
 let live = false;
 let currentStreamId = null;
 let lastUpdate = Date.now();
+let syncRunning = false;
 
 function formatHours(minutes) {
   return (minutes / 60).toFixed(1).replace(".", ",") + "h";
-}
-
-function parseWatchtime(value) {
-  const regex = /(\d+(?:\.\d+)?)\s*(years?|months?|days?|hours?|hrs?|minutes?|mins?|seconds?|secs?)/gi;
-
-  let total = 0;
-  let found = false;
-
-  for (const match of value.matchAll(regex)) {
-    found = true;
-    const amount = Number(match[1]);
-    const unit = match[2].toLowerCase();
-
-    if (unit.startsWith("year")) total += amount * 525600;
-    else if (unit.startsWith("month")) total += amount * 43200;
-    else if (unit.startsWith("day")) total += amount * 1440;
-    else if (unit.startsWith("hour") || unit.startsWith("hr")) total += amount * 60;
-    else if (unit.startsWith("min")) total += amount;
-    else if (unit.startsWith("sec")) total += amount / 60;
-  }
-
-  return found ? total : null;
 }
 
 function formatDaysHours(minutes) {
@@ -49,6 +33,105 @@ function formatDaysHours(minutes) {
   const hours = totalHours % 24;
 
   return `${days} ${days === 1 ? "Tag" : "Tage"} ${hours} ${hours === 1 ? "Stunde" : "Stunden"}`;
+}
+
+// StreamElements-Gesamtwatchtime vollständig synchronisieren
+async function syncStreamElementsWatchtime() {
+  if (syncRunning) return;
+  syncRunning = true;
+
+  try {
+    console.log("StreamElements-Synchronisierung gestartet");
+
+    let offset = 0;
+    let total = 0;
+    const allUsers = [];
+
+    while (true) {
+      const url =
+        `https://api.streamelements.com/kappa/v2/points/${SE_CHANNEL_ID}/watchtime?offset=${offset}&limit=${SE_LIMIT}`;
+
+      const response = await fetch(url);
+
+      if (!response.ok) {
+        throw new Error(
+          `StreamElements API Fehler ${response.status}: ${await response.text()}`
+        );
+      }
+
+      const data = await response.json();
+
+      if (!Array.isArray(data.users)) {
+        throw new Error("Ungültige StreamElements-Antwort");
+      }
+
+      allUsers.push(...data.users);
+      total = Number(data._total || allUsers.length);
+
+      console.log(
+        `Watchtime geladen: ${Math.min(offset + data.users.length, total)} / ${total}`
+      );
+
+      if (data.users.length === 0 || allUsers.length >= total) {
+        break;
+      }
+
+      offset += SE_LIMIT;
+    }
+
+    if (allUsers.length === 0) {
+      throw new Error("Keine Nutzer geladen – Datenbank bleibt unverändert");
+    }
+
+    // Nutzer in Paketen in Neon speichern
+    for (let start = 0; start < allUsers.length; start += 500) {
+      const batch = allUsers.slice(start, start + 500);
+      const values = [];
+      const placeholders = [];
+
+      batch.forEach((user, index) => {
+        const username = String(user.username || "").toLowerCase();
+        const minutes = Number(user.minutes);
+
+        if (!username || !Number.isFinite(minutes)) return;
+
+        const position = values.length / 2;
+        values.push(username, minutes);
+        placeholders.push(
+          `($${position * 2 + 1}, $${position * 2 + 2})`
+        );
+      });
+
+      if (placeholders.length === 0) continue;
+
+      await pool.query(
+        `INSERT INTO watchtime (user_login, minutes)
+         VALUES ${placeholders.join(",")}
+         ON CONFLICT (user_login)
+         DO UPDATE SET minutes = EXCLUDED.minutes`,
+        values
+      );
+    }
+
+    // Veraltete Einträge entfernen, wenn der vollständige Abruf gelang
+    const usernames = allUsers
+      .map(user => String(user.username || "").toLowerCase())
+      .filter(Boolean);
+
+    await pool.query(
+      `DELETE FROM watchtime
+       WHERE NOT (user_login = ANY($1::text[]))`,
+      [usernames]
+    );
+
+    console.log(
+      `StreamElements-Synchronisierung abgeschlossen: ${allUsers.length} Nutzer`
+    );
+  } catch (error) {
+    console.log("StreamElements-Sync Fehler:", error.message);
+  } finally {
+    syncRunning = false;
+  }
 }
 
 async function getChatters() {
@@ -189,40 +272,29 @@ app.get("/test", (req, res) => {
 
 app.get("/abstand", async (req, res) => {
   try {
-    const username = (req.query.user || "").toLowerCase();
-    const watchtimeText = req.query.time || "";
+    const username = String(req.query.user || "").toLowerCase();
 
-    if (!username || !watchtimeText) {
-      return res.send("Watchtime konnte nicht übertragen werden.");
+    if (!username) {
+      return res.send("ABSTAND » Benutzername fehlt.");
     }
-
-    const minutes = parseWatchtime(watchtimeText);
-
-    if (minutes === null) {
-      return res.send("Watchtime konnte nicht gelesen werden.");
-    }
-
-    await pool.query(
-      `INSERT INTO watchtime (user_login, minutes)
-       VALUES ($1, $2)
-       ON CONFLICT (user_login)
-       DO UPDATE SET minutes = $2`,
-      [username, minutes]
-    );
 
     const result = await pool.query(
       `SELECT user_login, minutes
        FROM watchtime
-       ORDER BY minutes DESC`
+       ORDER BY minutes DESC, user_login ASC`
     );
 
     const ranking = result.rows;
     const position = ranking.findIndex(
-      u => u.user_login.toLowerCase() === username
+      user => user.user_login.toLowerCase() === username
     );
 
+    if (position === -1) {
+      return res.send("ABSTAND » Keine Watchtime gefunden.");
+    }
+
     if (position === 0) {
-      return res.send("Du bist aktuell auf Platz 1!");
+      return res.send("ABSTAND ZUM NÄCHSTEN PLATZ » Du bist aktuell auf Platz 1!");
     }
 
     const missing = Math.max(
@@ -232,7 +304,9 @@ app.get("/abstand", async (req, res) => {
     );
 
     if (missing === 0) {
-      return res.send(`Du bist gleichauf mit Platz ${position}!`);
+      return res.send(
+        `ABSTAND ZUM NÄCHSTEN PLATZ » Du bist gleichauf mit Platz ${position}!`
+      );
     }
 
     res.send(
@@ -275,9 +349,13 @@ async function startServer() {
 
     app.listen(PORT, () => {
       console.log("Server läuft auf Port " + PORT);
+
       checkLive();
+      syncStreamElementsWatchtime();
+
       setInterval(checkLive, 60000);
       setInterval(trackChatters, 30000);
+      setInterval(syncStreamElementsWatchtime, 15 * 60 * 1000);
     });
   } catch (error) {
     console.log("Datenbank-Startfehler:", error.message);
@@ -286,5 +364,6 @@ async function startServer() {
 }
 
 startServer();
+
 
 
