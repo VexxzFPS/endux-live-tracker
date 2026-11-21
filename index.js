@@ -279,7 +279,7 @@ app.get("/top5", async (req, res) => {
 
               return `${rank} ${name} · ${time}`;
             })
-            .join("⠀")}`
+            .join("\n")}`
         : "TOP 5 WATCHTIME » Wird ermittelt"
     );
   } catch (error) {
