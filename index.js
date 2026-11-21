@@ -1,3 +1,4 @@
+
 const express = require("express");
 const { Pool } = require("pg");
 
@@ -13,17 +14,15 @@ const CLIENT_ID = process.env.TWITCH_CLIENT_ID;
 const TOKEN = process.env.TWITCH_USER_TOKEN;
 const CHANNEL = process.env.TWITCH_CHANNEL || "enduxfps";
 
-// StreamElements-Channel-ID von EnduxFPS
 const SE_CHANNEL_ID = "62a195a071bbb573d524e640";
 const SE_LIMIT = 100;
 
-// Bots, die NICHT in !top5 gezählt werden
 const EXCLUDED_USERS = [
   "nightbot",
   "streamelements",
-  "hexe_bot",
-  "streamlabs",
-  "creatisbot"
+  "moobot",
+  "fossabot",
+  "streamlabs"
 ];
 
 let live = false;
@@ -77,10 +76,7 @@ async function syncStreamElementsWatchtime() {
       total = Number(data._total || allUsers.length);
 
       console.log(
-        `Watchtime geladen: ${Math.min(
-          offset + data.users.length,
-          total
-        )} / ${total}`
+        `Watchtime geladen: ${Math.min(offset + data.users.length, total)} / ${total}`
       );
 
       if (data.users.length === 0 || allUsers.length >= total) {
@@ -91,9 +87,7 @@ async function syncStreamElementsWatchtime() {
     }
 
     if (allUsers.length === 0) {
-      throw new Error(
-        "Keine Nutzer geladen – Datenbank bleibt unverändert"
-      );
+      throw new Error("Keine Nutzer geladen – Datenbank bleibt unverändert");
     }
 
     for (let start = 0; start < allUsers.length; start += 500) {
@@ -245,7 +239,6 @@ async function trackChatters() {
   for (const chatter of chatters) {
     const username = chatter.user_login.toLowerCase();
 
-    // Bots nicht in !top5 zählen
     if (EXCLUDED_USERS.includes(username)) {
       continue;
     }
@@ -264,6 +257,7 @@ app.get("/", (req, res) => {
   res.send("Endux Live Tracker läuft");
 });
 
+// TOP 5
 app.get("/top5", async (req, res) => {
   try {
     const result = await pool.query(
@@ -275,19 +269,22 @@ app.get("/top5", async (req, res) => {
       [EXCLUDED_USERS]
     );
 
-   res.send(
-  result.rows.length
-    ? `TOP 5 WATCHTIME OF TODAY »⠀⠀⠀⠀⠀⠀⠀⠀${result.rows
-        .map((u, i) => {
-          const name = u.user_login.padEnd(16, " ").slice(0, 16);
-          const rank = `#${i + 1}`;
-          const time = formatHours(Number(u.minutes));
+    res.send(
+      result.rows.length
+        ? `TOP 5 WATCHTIME OF TODAY »⠀⠀⠀⠀⠀⠀⠀⠀${result.rows
+            .map((u, i) => {
+              const name = u.user_login.padEnd(16, " ").slice(0, 16);
+              const rank = `#${i + 1}`;
+              const time = formatHours(Number(u.minutes));
 
-          return `${rank} ${name} · ${time}`;
-        })
-        .join("⠀")}`
-    : "TOP 5 WATCHTIME » Wird ermittelt"
-);
+              return `${rank} ${name} · ${time}`;
+            })
+            .join("⠀")}`
+        : "TOP 5 WATCHTIME » Wird ermittelt"
+    );
+  } catch (error) {
+    console.log("Top5 Fehler:", error.message);
+    res.send("TOP 5 WATCHTIME » Fehler beim Laden");
   }
 });
 
@@ -297,6 +294,7 @@ app.get("/test", (req, res) => {
   );
 });
 
+// ABSTAND
 app.get("/abstand", async (req, res) => {
   try {
     const username = String(req.query.user || "").toLowerCase();
@@ -356,6 +354,7 @@ app.get("/abstandtest", (req, res) => {
   );
 });
 
+// SERVER START
 async function startServer() {
   try {
     await pool.query(`
@@ -396,6 +395,7 @@ async function startServer() {
 }
 
 startServer();
+
 
 
 
