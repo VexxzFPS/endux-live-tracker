@@ -277,7 +277,7 @@ app.get("/top5", async (req, res) => {
 
     res.send(
       result.rows.length
-        ? `TOP 5 WATCHTIME OF TODAY » ${result.rows
+        ? `TOP 5 WATCHTIME OF TODAY »     ${result.rows
             .map(
               (u, i) =>
                 `#${i + 1} ${u.user_login} · ${formatHours(
