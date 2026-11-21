@@ -21,6 +21,36 @@ function formatHours(minutes) {
   return (minutes / 60).toFixed(1).replace(".", ",") + "h";
 }
 
+function parseWatchtime(value) {
+  const regex = /(\d+(?:\.\d+)?)\s*(years?|months?|days?|hours?|hrs?|minutes?|mins?|seconds?|secs?)/gi;
+
+  let total = 0;
+  let found = false;
+
+  for (const match of value.matchAll(regex)) {
+    found = true;
+    const amount = Number(match[1]);
+    const unit = match[2].toLowerCase();
+
+    if (unit.startsWith("year")) total += amount * 525600;
+    else if (unit.startsWith("month")) total += amount * 43200;
+    else if (unit.startsWith("day")) total += amount * 1440;
+    else if (unit.startsWith("hour") || unit.startsWith("hr")) total += amount * 60;
+    else if (unit.startsWith("min")) total += amount;
+    else if (unit.startsWith("sec")) total += amount / 60;
+  }
+
+  return found ? total : null;
+}
+
+function formatDaysHours(minutes) {
+  const totalHours = Math.max(1, Math.ceil(minutes / 60));
+  const days = Math.floor(totalHours / 24);
+  const hours = totalHours % 24;
+
+  return `${days} ${days === 1 ? "Tag" : "Tage"} ${hours} ${hours === 1 ? "Stunde" : "Stunden"}`;
+}
+
 async function getChatters() {
   const response = await fetch(
     `https://api.twitch.tv/helix/chat/chatters?broadcaster_id=${process.env.BROADCASTER_ID}&moderator_id=${process.env.MODERATOR_ID}`,
@@ -84,7 +114,7 @@ async function checkLive() {
 
           console.log("Neuer Stream – Ranking zurückgesetzt");
         } else {
-          console.log("Render-Neustart – bisheriges Ranking bleibt erhalten");
+          console.log("Neustart – bisheriges Ranking bleibt erhalten");
         }
 
         currentStreamId = streamId;
@@ -93,9 +123,7 @@ async function checkLive() {
 
       live = true;
     } else {
-      if (live) {
-        console.log("Endux offline – Tracking gestoppt");
-      }
+      if (live) console.log("Endux offline – Tracking gestoppt");
 
       live = false;
       currentStreamId = null;
@@ -110,7 +138,6 @@ async function trackChatters() {
   if (!live) return;
 
   const chatters = await getChatters();
-
   if (chatters === null) return;
 
   const now = Date.now();
@@ -118,14 +145,12 @@ async function trackChatters() {
   lastUpdate = now;
 
   for (const chatter of chatters) {
-    const username = chatter.user_login;
-
     await pool.query(
       `INSERT INTO stream_watchtime (user_login, minutes)
        VALUES ($1, $2)
        ON CONFLICT (user_login)
        DO UPDATE SET minutes = stream_watchtime.minutes + $2`,
-      [username, elapsed]
+      [chatter.user_login, elapsed]
     );
   }
 }
@@ -143,11 +168,9 @@ app.get("/top5", async (req, res) => {
        LIMIT 5`
     );
 
-    const top = result.rows;
-
     res.send(
-      top.length
-        ? `TOP 5 WATCHTIME » ${top.map((u, i) =>
+      result.rows.length
+        ? `TOP 5 WATCHTIME » ${result.rows.map((u, i) =>
             `#${i + 1} ${u.user_login} ◆ ${formatHours(Number(u.minutes))}`
           ).join(" | ")}`
         : "TOP 5 WATCHTIME » Wird ermittelt"
@@ -167,10 +190,29 @@ app.get("/test", (req, res) => {
 app.get("/abstand", async (req, res) => {
   try {
     const username = (req.query.user || "").toLowerCase();
+    const watchtimeText = req.query.time || "";
+
+    if (!username || !watchtimeText) {
+      return res.send("Watchtime konnte nicht übertragen werden.");
+    }
+
+    const minutes = parseWatchtime(watchtimeText);
+
+    if (minutes === null) {
+      return res.send("Watchtime konnte nicht gelesen werden.");
+    }
+
+    await pool.query(
+      `INSERT INTO watchtime (user_login, minutes)
+       VALUES ($1, $2)
+       ON CONFLICT (user_login)
+       DO UPDATE SET minutes = $2`,
+      [username, minutes]
+    );
 
     const result = await pool.query(
       `SELECT user_login, minutes
-       FROM stream_watchtime
+       FROM watchtime
        ORDER BY minutes DESC`
     );
 
@@ -178,12 +220,6 @@ app.get("/abstand", async (req, res) => {
     const position = ranking.findIndex(
       u => u.user_login.toLowerCase() === username
     );
-
-    if (position === -1) {
-      return res.send(
-        "Du bist noch nicht im Watchtime-Ranking, bleib noch etwas da ^^"
-      );
-    }
 
     if (position === 0) {
       return res.send("Du bist aktuell auf Platz 1!");
@@ -195,8 +231,12 @@ app.get("/abstand", async (req, res) => {
       Number(ranking[position].minutes)
     );
 
+    if (missing === 0) {
+      return res.send(`Du bist gleichauf mit Platz ${position}!`);
+    }
+
     res.send(
-      `ABSTAND ZUM NÄCHSTEN PLATZ » Noch ${formatHours(missing)} bis Platz ${position}!`
+      `ABSTAND ZUM NÄCHSTEN PLATZ » Noch ${formatDaysHours(missing)} bis Platz ${position}!`
     );
   } catch (error) {
     console.log("Abstand Fehler:", error.message);
@@ -206,7 +246,7 @@ app.get("/abstand", async (req, res) => {
 
 app.get("/abstandtest", (req, res) => {
   res.send(
-    "ABSTAND ZUM NÄCHSTEN PLATZ » Noch 0,2h bis Platz 3!"
+    "ABSTAND ZUM NÄCHSTEN PLATZ » Noch 2 Tage 14 Stunden bis Platz 3!"
   );
 });
 
@@ -216,6 +256,20 @@ async function startServer() {
       CREATE TABLE IF NOT EXISTS tracker_state (
         id INTEGER PRIMARY KEY,
         stream_id TEXT
+      )
+    `);
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS stream_watchtime (
+        user_login TEXT PRIMARY KEY,
+        minutes DOUBLE PRECISION NOT NULL DEFAULT 0
+      )
+    `);
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS watchtime (
+        user_login TEXT PRIMARY KEY,
+        minutes DOUBLE PRECISION NOT NULL DEFAULT 0
       )
     `);
 
@@ -232,4 +286,5 @@ async function startServer() {
 }
 
 startServer();
+
 
