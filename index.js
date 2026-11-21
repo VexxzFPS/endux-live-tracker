@@ -102,6 +102,30 @@ app.get("/test", (req, res) => {
   );
 });
 
+app.get("/abstand", (req, res) => {
+  const username = (req.query.user || "").toLowerCase();
+
+  const ranking = [...scores.entries()]
+    .sort((a, b) => b[1] - a[1]);
+
+  const position = ranking.findIndex(u => u[0].toLowerCase() === username);
+
+  if (position === -1) {
+    return res.send("Du bist noch nicht im Watchtime-Ranking.");
+  }
+
+  if (position === 0) {
+    return res.send("Du bist aktuell auf Platz 1!");
+  }
+
+  const missing = Math.max(
+    1,
+    Math.ceil(ranking[position - 1][1] - ranking[position][1])
+  );
+
+  res.send(`ABSTAND ZUM NÄCHSTEN PLATZ » Noch ${missing} Min. bis Platz ${position}!`);
+});
+
 app.listen(PORT, () => {
   console.log("Server läuft auf Port " + PORT);
   checkLive();
