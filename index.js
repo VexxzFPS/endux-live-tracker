@@ -87,11 +87,14 @@ app.get("/top5", (req, res) => {
     .sort((a, b) => b[1] - a[1])
     .slice(0, 5);
 
-  res.send(top.length
-    ? top.map((u, i) =>
-        `${["#1", "#2", "#3", "#4", "#5"][i]} ${u[0]} (${Math.floor(u[1])} Min.)`
-      ).join("⠀")
-    : "Top 5 – Viewer mit der meisten Watchtime des heutigen Streams");
+  res.send(
+    top.length
+      ? `TOP 5 WATCHTIME » ${top.map((u, i) =>
+          `${["➊", "➋", "➌", "➍", "➎"][i]} ${u[0]} ◆ ${Math.floor(u[1])}m`
+        ).join(" | ")}`
+      : "TOP 5 WATCHTIME » Wird ermittelt"
+  );
+});
 });
 app.get("/test", (req, res) => {
   res.send(
