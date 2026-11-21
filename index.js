@@ -91,7 +91,7 @@ app.get("/top5", (req, res) => {
     ? top.map((u, i) =>
         `${i + 1}. ${u[0]} (${Math.floor(u[1])} Min.)`
       ).join(" | ")
-    : "Noch keine aktiven Chatter");
+    : "🏆 Top 5 werden ermittelt");
 });
 
 app.listen(PORT, () => {
