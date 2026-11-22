@@ -20,8 +20,8 @@ const SE_LIMIT = 100;
 const EXCLUDED_USERS = [
   "nightbot",
   "streamelements",
-  "moobot",
-  "fossabot",
+  "hexe_bot",
+  "creatisbot",
   "streamlabs"
 ];
 
