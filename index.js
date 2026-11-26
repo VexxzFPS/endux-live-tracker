@@ -22,7 +22,8 @@ const EXCLUDED_USERS = [
   "streamelements",
   "hexe_bot",
   "creatisbot",
-  "streamlabs"
+  "streamlabs",
+  "enduxfps"
 ];
 
 let live = false;
